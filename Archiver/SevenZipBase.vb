@@ -308,8 +308,9 @@ Public MustInherit Class SevenZipBase
         Dim arg = _memoryBlock.ToArg()
         If arg IsNot Nothing Then sb.Append(arg)
 
+        ' Only add switch if different from default
         Console.WriteLine($"StoreLastMofifiedTS: {_storeLastModifiedTS}")
-        If _storeLastModifiedTS Then sb.Append(" -mtm=on")
+        If Not _storeLastModifiedTS Then sb.Append(" -mtm=off")
 
         Console.WriteLine($"StoreCreationTS: {_storeCreationTS}")
         If _storeCreationTS Then sb.Append(" -mtc=on")
@@ -318,7 +319,7 @@ Public MustInherit Class SevenZipBase
         If _storeLastAccessTS Then sb.Append(" -mta=on")
 
         Console.WriteLine($"StoreFileAttributes: {_storeFileAttributes}")
-        If _storeFileAttributes Then sb.Append(" -mtr=on")
+        If Not _storeFileAttributes Then sb.Append(" -mtr=off")
 
         Console.WriteLine("Command String: " & sb.ToString())
         Return sb.ToString()
