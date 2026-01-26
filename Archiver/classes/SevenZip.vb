@@ -12,7 +12,7 @@ Public Interface ISevenZip
 End Interface
 
 <ProgId("Archiver.7z"), ComVisible(True), ClassInterface(ClassInterfaceType.None)>
-<Guid("7B4239A2-56D4-484A-99D0-C748DA5293F6")>
+<Guid("2CB7944F-88B3-43D5-B081-C3098A8ACC69")>
 Public Class SevenZip
 
     Implements ISevenZip
