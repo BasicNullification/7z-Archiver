@@ -278,7 +278,7 @@ Public MustInherit Class SevenZipBase
     ''' <param name="Mode">The update mode (AddToArchive or UpdateArchive).</param>
     ''' <returns>The constructed command string.</returns>
     Protected Function GetCommandString(Mode As UpdateMode) As String
-        Dim sb As New System.Text.StringBuilder(ConsolePath)
+        Dim sb As New System.Text.StringBuilder()
 
         Select Case Mode
             Case UpdateMode.AddToArchive
