@@ -1,16 +1,16 @@
-﻿<ComVisible(True), InterfaceType(ComInterfaceType.InterfaceIsDual)>
-<Guid("052830F7-6AEB-495E-A209-3AB33AEEAFA1")>
-Public Interface IAdd
-    Inherits ISevenZipBase
+﻿'<ComVisible(True), InterfaceType(ComInterfaceType.InterfaceIsDual)>
+'<Guid("052830F7-6AEB-495E-A209-3AB33AEEAFA1")>
+'Public Interface IAdd
+'    Inherits ISevenZipBase
+'
+'End Interface
 
-End Interface
-
-<ComVisible(True), ClassInterface(ClassInterfaceType.None)>
+<ProgId("Archiver.Add"), ComVisible(True), ClassInterface(ClassInterfaceType.None)>
 <Guid("1D8FF0DD-46A3-425F-B903-5479B417CD00")>
 Public Class Add
 
     Inherits SevenZipBase
-    Implements IAdd
+    Implements ISevenZipBase
 
     Protected Overrides ReadOnly Property OperationMode As UpdateMode
         Get

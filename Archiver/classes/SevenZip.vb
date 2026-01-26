@@ -5,10 +5,10 @@ Public Interface ISevenZip
     Property ProgDirectory As String
 
     <Description("Update older files in the archive and add files that are not already in the archive.")>
-    Function Update(ByVal ArchivePath As String) As IUpdate
+    Function Update(ByVal ArchivePath As String) As Update
 
     <Description("Add files to the archive.")>
-    Function Add(ByVal ArchivePath As String) As IAdd
+    Function Add(ByVal ArchivePath As String) As Add
 End Interface
 
 <ProgId("Archiver.7z"), ComVisible(True), ClassInterface(ClassInterfaceType.None)>
@@ -39,7 +39,7 @@ Public Class SevenZip
     ''' </summary>
     ''' <param name="ArchivePath"></param>
     ''' <returns></returns>
-    Public Function Update(ByVal ArchivePath As String) As IUpdate Implements ISevenZip.Update
+    Public Function Update(ByVal ArchivePath As String) As Update Implements ISevenZip.Update
         Return New Update(ArchivePath)
     End Function
 
@@ -48,7 +48,7 @@ Public Class SevenZip
     ''' </summary>
     ''' <param name="ArchivePath"></param>
     ''' <returns></returns>
-    Public Function Add(ByVal ArchivePath As String) As IAdd Implements ISevenZip.Add
+    Public Function Add(ByVal ArchivePath As String) As Add Implements ISevenZip.Add
         Return New Add(ArchivePath)
     End Function
 

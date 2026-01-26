@@ -1,6 +1,8 @@
 ﻿Imports System.IO
 Imports System.Text
 
+<ComVisible(True), InterfaceType(ComInterfaceType.InterfaceIsDual)>
+<Guid("D47A8BC0-0EB8-4D18-B16B-06D12DE9ABCA")>
 Public Interface ISevenZipBase
     <Description("Get/Set the output log level")>
     Property OutputLogLevel As SevenZipOutputLogLevel
@@ -30,6 +32,7 @@ End Interface
 ''' <summary>
 ''' Base class for 7-Zip operations, providing common properties and methods.
 ''' </summary>
+<ClassInterface(ClassInterfaceType.None)>
 Public MustInherit Class SevenZipBase
 
     Implements ISevenZipBase
