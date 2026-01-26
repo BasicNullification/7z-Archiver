@@ -6,6 +6,7 @@
 ''' Size-based values (Bytes, KiB, MiB, GiB, TiB) require a positive size and
 ''' specify the solid block size using the selected unit.
 ''' </remarks>
+<ComVisible(True)>
 <Description("Defines the solid memory block mode used by the archive. Can disable solid mode, enable it using defaults, or specify an explicit block size in bytes or binary units.")>
 Public Enum MemoryBlockMode
     Disabled = 0
@@ -21,6 +22,7 @@ End Enum
 ''' <summary>
 ''' Controls output verbosity for archive operations.
 ''' </summary>
+<ComVisible(True)>
 <Description("Controls output verbosity for 7-Zip archive operations.")>
 Public Enum SevenZipOutputLogLevel
     ''' <summary>No logging (default).</summary>
