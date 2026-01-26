@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 # Paths (relative to this script)
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $assemblyInfoPath = Join-Path $scriptDir "..\My Project\AssemblyInfo.vb"
-$issPath          = Join-Path $scriptDir ".\inno_setup.iss"
+$issPath          = Join-Path $scriptDir ".\inno_script.iss"
 
 if (-not (Test-Path $assemblyInfoPath)) {
     throw "AssemblyInfo.vb not found: $assemblyInfoPath"

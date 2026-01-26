@@ -32,13 +32,10 @@ UsePreviousAppDir=yes
 
 [Files]
 ; x86 build -> Program Files (x86) on 64-bit, Program Files on 32-bit
-Source: "bin\x86\Release\{#AssemblyName}.dll"; DestDir: "{autopf32}\{#Publisher}\{#AssemblyName}"; Flags: ignoreversion overwritereadonly restartreplace uninsrestartdelete
+Source: "..\bin\x86\Release\{#AssemblyName}.dll"; DestDir: "{autopf32}\{#Publisher}\{#AssemblyName}"; Flags: ignoreversion overwritereadonly restartreplace uninsrestartdelete
 
 ; x64 build -> only on 64-bit OS
-Source: "bin\x64\Release\{#AssemblyName}.dll"; DestDir: "{autopf}\{#Publisher}\{#AssemblyName}"; Flags: ignoreversion overwritereadonly restartreplace uninsrestartdelete; Check: IsWin64
-
-[Setup]
-OutputBaseFilename={#AssemblyName}-Setup-v{#AppVersion}
+Source: "..\bin\x64\Release\{#AssemblyName}.dll"; DestDir: "{autopf}\{#Publisher}\{#AssemblyName}"; Flags: ignoreversion overwritereadonly restartreplace uninsrestartdelete; Check: IsWin64
 
 [Code]
 function RegAsm32Path(): string;
