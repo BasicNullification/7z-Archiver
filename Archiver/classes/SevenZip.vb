@@ -17,6 +17,10 @@ Public Class SevenZip
 
     Implements ISevenZip
 
+    ''' <summary>
+    ''' Location of the 7-Zip program directory. Defaults to 'C:\Program Files\7-Zip'.
+    ''' </summary>
+    ''' <returns></returns>
     Public Property ProgDirectory As String Implements ISevenZip.ProgDirectory
         Get
             Return Globals.Directory
@@ -26,10 +30,20 @@ Public Class SevenZip
         End Set
     End Property
 
+    ''' <summary>
+    ''' Update older files in the archive and add files that are not already in the archive.
+    ''' </summary>
+    ''' <param name="ArchivePath"></param>
+    ''' <returns></returns>
     Public Function Update(ByVal ArchivePath As String) As IUpdate Implements ISevenZip.Update
         Return New Update(ArchivePath)
     End Function
 
+    ''' <summary>
+    ''' Add new files to the archive.
+    ''' </summary>
+    ''' <param name="ArchivePath"></param>
+    ''' <returns></returns>
     Public Function Add(ByVal ArchivePath As String) As IAdd Implements ISevenZip.Add
         Return New Add(ArchivePath)
     End Function

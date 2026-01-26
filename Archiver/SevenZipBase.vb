@@ -8,15 +8,27 @@ Public Interface ISevenZipBase
     Property CompressionLevel As Integer
     <Description("Sets level of analysis. Valid values are 0 (no analysis) to 9 (maximum analysis).")>
     Property AnalysisLevel As Integer
+    <Description("Store last modified timestamp in the archive.")>
+    Property StoreLastModifiedTS As Boolean
+    <Description("Store creation timestamp in the archive.")>
+    Property StoreCreationTS As Boolean
+    <Description("Store last access timestamp in the archive.")>
+    Property StoreLastAccessTS As Boolean
+    <Description("Store file attributes in the archive.")>
+    Property StoreFileAttributes As Boolean
 
     <Description("Adds a single file to the archive.")>
     Sub AddFile(ByVal Filepath As String)
     <Description("Adds multiple files to the archive using an Array(...). If {BaseDirectory} is supplied, each file will be prefixed with this path.")>
     Sub AddFiles(ByVal FilepathArr As Object, Optional BaseDirectory As String = Nothing)
+    <Description("Sets the memory block size for compression operations.")>
     Sub SetMemoryBlockSize(Mode As MemoryBlockMode, Optional Size As Integer = 0)
 
 End Interface
 
+''' <summary>
+''' Base class for 7-Zip operations, providing common properties and methods.
+''' </summary>
 Public MustInherit Class SevenZipBase
 
     Implements ISevenZipBase
@@ -27,6 +39,10 @@ Public MustInherit Class SevenZipBase
     Protected _outputLogLevel As SevenZipOutputLogLevel = SevenZipOutputLogLevel.Disabled
     Protected _filesToAdd As New List(Of String)
     Protected _memoryBlock As New MemoryBlock
+    Protected _storeLastModifiedTS As Boolean = True
+    Protected _storeCreationTS As Boolean = False
+    Protected _storeLastAccessTS As Boolean = False
+    Protected _storeFileAttributes As Boolean = True
 
     Protected Sub New(ByVal ArchivePath As String)
         _archivePath = ArchivePath
@@ -79,10 +95,71 @@ Public MustInherit Class SevenZipBase
         End Set
     End Property
 
+    ''' <summary>
+    ''' Store last modified timestamp in the archive.
+    ''' </summary>
+    ''' <returns>A Boolean indicating whether to store the last modified timestamp.</returns>
+    Public Property StoreLastModifiedTS As Boolean Implements ISevenZipBase.StoreLastModifiedTS
+        Get
+            Return _storeLastModifiedTS
+        End Get
+        Set(value As Boolean)
+            _storeLastModifiedTS = value
+        End Set
+    End Property
+
+    ''' <summary>
+    ''' Store creation timestamp in the archive.
+    ''' </summary>
+    ''' <returns>A Boolean indicating whether to store the creation timestamp.</returns>
+    Public Property StoreCreationTS As Boolean Implements ISevenZipBase.StoreCreationTS
+        Get
+            Return _storeCreationTS
+        End Get
+        Set(value As Boolean)
+            _storeCreationTS = value
+        End Set
+    End Property
+
+    ''' <summary>
+    ''' Store last access timestamp in the archive.
+    ''' </summary>
+    ''' <returns>A Boolean indicating whether to store the last access timestamp.</returns>
+    Public Property StoreLastAccessTS As Boolean Implements ISevenZipBase.StoreLastAccessTS
+        Get
+            Return _storeLastAccessTS
+        End Get
+        Set(value As Boolean)
+            _storeLastAccessTS = value
+        End Set
+    End Property
+
+    ''' <summary>
+    ''' Store file attributes in the archive.
+    ''' </summary>
+    ''' <returns>A Boolean indicating whether to store file attributes.</returns>
+    Public Property StoreFileAttributes As Boolean Implements ISevenZipBase.StoreFileAttributes
+        Get
+            Return _storeFileAttributes
+        End Get
+        Set(value As Boolean)
+            _storeFileAttributes = value
+        End Set
+    End Property
+
+    ''' <summary>
+    ''' Adds a single file to the archive.
+    ''' </summary>
+    ''' <param name="Filepath">The path of the file to add.</param>
     Public Sub AddFile(Filepath As String) Implements ISevenZipBase.AddFile
         _filesToAdd.Add(Filepath)
     End Sub
 
+    ''' <summary>
+    ''' Adds multiple files to the archive using an Array(...). If {BaseDirectory} is supplied, each file will be prefixed with this path.
+    ''' </summary>
+    ''' <param name="FilepathArr"></param>
+    ''' <param name="BaseDirectory"></param>
     Public Sub AddFiles(ByVal FilepathArr As Object, Optional ByVal BaseDirectory As String = Nothing) Implements ISevenZipBase.AddFiles
 
         Dim paths = CoerceToStringArray(FilepathArr)
@@ -100,6 +177,11 @@ Public MustInherit Class SevenZipBase
         )
     End Sub
 
+    ''' <summary>
+    ''' Sets the memory block size for compression operations.
+    ''' </summary>
+    ''' <param name="Mode">The memory block mode.</param>
+    ''' <param name="Size">The size of the memory block (required for certain modes).</param>
     Public Sub SetMemoryBlockSize(Mode As MemoryBlockMode, Optional Size As Integer = 0) Implements ISevenZipBase.SetMemoryBlockSize
         _memoryBlock.Mode = Mode
         Select Case Mode
@@ -114,6 +196,11 @@ Public MustInherit Class SevenZipBase
         End Select
     End Sub
 
+    ''' <summary>
+    ''' Coerces an object to a String array.
+    ''' </summary>
+    ''' <param name="value">The object to coerce.</param>
+    ''' <returns>A String array.</returns>
     Protected Shared Function CoerceToStringArray(ByVal value As Object) As String()
         If value Is Nothing Then
             Throw New ArgumentNullException(NameOf(value))
@@ -125,7 +212,7 @@ Public MustInherit Class SevenZipBase
 
         Dim arr = TryCast(value, System.Array)
         If arr Is Nothing Then
-            Throw New ArgumentException("FilePaths must be an array (e.g., VBScript: Array(""File1"",""File2"")).", NameOf(value))
+            Throw New ArgumentException("FilePaths must be an array (e.g., Array(""File1"",""File2"")).", NameOf(value))
         End If
 
         Dim list As New List(Of String)(arr.Length)
@@ -138,6 +225,11 @@ Public MustInherit Class SevenZipBase
         Return list.ToArray()
     End Function
 
+    ''' <summary>
+    ''' Writes a temporary file containing the list of files to be processed by 7-Zip.
+    ''' </summary>
+    ''' <param name="paths">The list of file paths.</param>
+    ''' <returns>The path to the temporary list file.</returns>
     Protected Shared Function Write7ZipListFile(ByVal paths As IEnumerable(Of String)) As String
         Dim listPath = Path.Combine(Path.GetTempPath(), $"7z_filelist_{Guid.NewGuid():N}.txt")
 
@@ -147,6 +239,9 @@ Public MustInherit Class SevenZipBase
         Return listPath
     End Function
 
+    ''' <summary>
+    ''' Represents the memory block configuration for 7-Zip operations.
+    ''' </summary>
     Protected Class MemoryBlock
         Property Mode As MemoryBlockMode = MemoryBlockMode.Disabled
         Property Size() As Integer = 0
@@ -174,7 +269,11 @@ Public MustInherit Class SevenZipBase
 
     End Class
 
-
+    ''' <summary>
+    ''' Constructs the command string for 7-Zip operations based on the specified update mode.
+    ''' </summary>
+    ''' <param name="Mode">The update mode (AddToArchive or UpdateArchive).</param>
+    ''' <returns>The constructed command string.</returns>
     Protected Function GetCommandString(Mode As UpdateMode) As String
         Dim sb As New System.Text.StringBuilder(ConsolePath)
 
@@ -206,6 +305,19 @@ Public MustInherit Class SevenZipBase
         Dim arg = _memoryBlock.ToArg()
         If arg IsNot Nothing Then sb.Append(arg)
 
+        Console.WriteLine($"StoreLastMofifiedTS: {_storeLastModifiedTS}")
+        If _storeLastModifiedTS Then sb.Append(" -mtm=on")
+
+        Console.WriteLine($"StoreCreationTS: {_storeCreationTS}")
+        If _storeCreationTS Then sb.Append(" -mtc=on")
+
+        Console.WriteLine($"StoreLastAccessTS: {_storeLastAccessTS}")
+        If _storeLastAccessTS Then sb.Append(" -mta=on")
+
+        Console.WriteLine($"StoreFileAttributes: {_storeFileAttributes}")
+        If _storeFileAttributes Then sb.Append(" -mtr=on")
+
+        Console.WriteLine("Command String: " & sb.ToString())
         Return sb.ToString()
     End Function
 
