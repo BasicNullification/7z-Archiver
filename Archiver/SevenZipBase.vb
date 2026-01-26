@@ -23,6 +23,7 @@ Public Interface ISevenZipBase
     Sub AddFiles(ByVal FilepathArr As Object, Optional BaseDirectory As String = Nothing)
     <Description("Sets the memory block size for compression operations.")>
     Sub SetMemoryBlockSize(Mode As MemoryBlockMode, Optional Size As Integer = 0)
+    Sub Execute()
 
 End Interface
 
@@ -32,6 +33,8 @@ End Interface
 Public MustInherit Class SevenZipBase
 
     Implements ISevenZipBase
+
+    Protected MustOverride ReadOnly Property OperationMode As UpdateMode
 
     Protected _archivePath As String
     Protected _analysisLevel As Integer = 5
@@ -320,6 +323,11 @@ Public MustInherit Class SevenZipBase
         Console.WriteLine("Command String: " & sb.ToString())
         Return sb.ToString()
     End Function
+
+    Public Sub Execute() Implements ISevenZipBase.Execute
+        Dim cmd As String = GetCommandString(OperationMode)
+        Dim exitCode As Integer = Helpers.RunCommand(cmd)
+    End Sub
 
     Protected Enum UpdateMode
         AddToArchive

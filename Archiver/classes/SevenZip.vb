@@ -17,6 +17,10 @@ Public Class SevenZip
 
     Implements ISevenZip
 
+    Public Sub New()
+
+    End Sub
+
     ''' <summary>
     ''' Location of the 7-Zip program directory. Defaults to 'C:\Program Files\7-Zip'.
     ''' </summary>

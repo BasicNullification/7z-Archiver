@@ -2,6 +2,7 @@
 <Guid("F78D7E0B-06B8-4AE9-A041-EF1430546489")>
 Public Interface IUpdate
     Inherits ISevenZipBase
+
 End Interface
 
 <ComVisible(True), ClassInterface(ClassInterfaceType.None)>
@@ -9,8 +10,16 @@ End Interface
 Public Class Update
 
     Inherits SevenZipBase
+    Implements IUpdate
+
+    Protected Overrides ReadOnly Property OperationMode As UpdateMode
+        Get
+            Return UpdateMode.UpdateArchive
+        End Get
+    End Property
 
     Friend Sub New(ByVal ArchivePath As String)
         MyBase.New(ArchivePath)
     End Sub
+
 End Class

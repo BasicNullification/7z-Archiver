@@ -90,6 +90,7 @@
     <Compile Include="classes\SevenZip.vb" />
     <Compile Include="enums.vb" />
     <Compile Include="Globals.vb" />
+    <Compile Include="Helpers.vb" />
     <Compile Include="My Project\AssemblyInfo.vb" />
     <Compile Include="My Project\Application.Designer.vb">
       <AutoGen>True</AutoGen>
