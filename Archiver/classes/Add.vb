@@ -1,6 +1,10 @@
 ﻿Public Interface IAdd
+    Inherits ISevenZipBase
 End Interface
 Public Class Add
-    Friend Sub New()
+    Inherits SevenZipBase
+    Friend Sub New(ByVal ArchivePath As String)
+        MyBase.New(ArchivePath)
     End Sub
+
 End Class
