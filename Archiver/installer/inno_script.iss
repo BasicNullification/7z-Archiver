@@ -15,7 +15,7 @@ AppPublisher={#Publisher}
 OutputDir=..\..\dist\installer
 OutputBaseFilename={#AssemblyName}-Setup-v{#AppVersion3}
 
-DefaultDirName={autopf}\{#Publisher}\{#AssemblyName}
+DefaultDirName={commoncf}\{#Publisher}\{#AssemblyName}
 
 DisableDirPage=yes
 DisableProgramGroupPage=yes
@@ -28,14 +28,14 @@ UninstallDisplayName={#AssemblyName} COM Library
 Compression=lzma2
 SolidCompression=yes
 ChangesEnvironment=no
-UsePreviousAppDir=yes
+UsePreviousAppDir=no
 
 [Files]
 ; x86 build -> Program Files (x86) on 64-bit, Program Files on 32-bit
-Source: "..\bin\x86\Release\{#AssemblyName}.dll"; DestDir: "{autopf32}\{#Publisher}\{#AssemblyName}"; Flags: ignoreversion overwritereadonly restartreplace uninsrestartdelete
+Source: "..\bin\x86\Release\{#AssemblyName}.dll"; DestDir: "{commoncf32}\{#Publisher}\{#AssemblyName}"; Flags: ignoreversion overwritereadonly restartreplace uninsrestartdelete
 
 ; x64 build -> only on 64-bit OS
-Source: "..\bin\x64\Release\{#AssemblyName}.dll"; DestDir: "{autopf}\{#Publisher}\{#AssemblyName}"; Flags: ignoreversion overwritereadonly restartreplace uninsrestartdelete; Check: IsWin64
+Source: "..\bin\x64\Release\{#AssemblyName}.dll"; DestDir: "{commoncf}\{#Publisher}\{#AssemblyName}"; Flags: ignoreversion overwritereadonly restartreplace uninsrestartdelete; Check: IsWin64
 
 [Code]
 function RegAsm32Path(): string;
@@ -50,12 +50,12 @@ end;
 
 function DllPathX86(): string;
 begin
-  Result := ExpandConstant('{autopf32}\{#Publisher}\{#AssemblyName}\{#AssemblyName}.dll');
+  Result := ExpandConstant('{commoncf32}\{#Publisher}\{#AssemblyName}\{#AssemblyName}.dll');
 end;
 
 function DllPathX64(): string;
 begin
-  Result := ExpandConstant('{autopf}\{#Publisher}\{#AssemblyName}\{#AssemblyName}.dll');
+  Result := ExpandConstant('{commoncf}\{#Publisher}\{#AssemblyName}\{#AssemblyName}.dll');
 end;
 
 procedure ExecOrLog(const Exe, Params: string);
