@@ -1,0 +1,40 @@
+name: CI Build
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        platform: [x86, x64]
+        configuration: [Release]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build Archiver (${{ matrix.platform }})
+        run: |
+          msbuild Archiver/Archiver.vbproj `
+            /p:Configuration=${{ matrix.configuration }} `
+            /p:Platform=${{ matrix.platform }} `
+            /p:SignAssembly=false `
+            /v:minimal
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Archiver-${{ matrix.configuration }}-${{ matrix.platform }}
+          path: Archiver/bin/${{ matrix.platform }}/${{ matrix.configuration }}/
+          if-no-files-found: error

@@ -1,6 +1,10 @@
 Archiver (COM 7-Zip wrapper)
 ============================
 
+[![CI](https://github.com/BasicNullification/7z-Archiver/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BasicNullification/7z-Archiver/actions/workflows/ci.yml)
+[![Release](https://github.com/BasicNullification/7z-Archiver/actions/workflows/release.yml/badge.svg)](https://github.com/BasicNullification/7z-Archiver/actions/workflows/release.yml)
+
+
 A minimal COM-visible wrapper around the 7-Zip console (`7z.exe`) focused on creating and updating archives from scripting languages (VBScript, WSH, classic ASP) or VBA. Both x86 and x64 builds are provided. The wrapper delegates all real work to the 7-Zip console and simply builds command strings, writes file lists, and runs the process.
 
 Features
