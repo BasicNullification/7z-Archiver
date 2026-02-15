@@ -4,16 +4,15 @@
 #ifndef AppVersion
   #define AppVersion "0.0.0"
 #endif
-#define AppVersion3 Copy(AppVersion, 1, RPos(".", AppVersion)-1)
 
 [Setup]
 AppId={#AppId}
 AppName={#AssemblyName}
-AppVersion={#AppVersion3}
+AppVersion={#AppVersion}
 AppPublisher={#Publisher}
 
 OutputDir=..\..\dist\installer
-OutputBaseFilename={#AssemblyName}-Setup-v{#AppVersion3}
+OutputBaseFilename={#AssemblyName}-Setup-v{#AppVersion}
 
 DefaultDirName={commoncf}\{#Publisher}\{#AssemblyName}
 
@@ -29,6 +28,7 @@ Compression=lzma2
 SolidCompression=yes
 ChangesEnvironment=no
 UsePreviousAppDir=no
+
 
 [Files]
 ; x86 build -> Program Files (x86) on 64-bit, Program Files on 32-bit

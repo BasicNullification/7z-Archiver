@@ -1,0 +1,371 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Signed ${{ matrix.platform }}
+    runs-on: windows-latest
+    environment: release
+
+    strategy:
+      matrix:
+        platform: [x86, x64]
+        configuration: [Release]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Decode and prepare signing key
+        env:
+          SIGNINGKEY_B64: ${{ secrets.SIGNINGKEY_B64 }}
+          SIGNINGKEY_PASSWORD: ${{ secrets.SIGNINGKEY_PASSWORD }}
+        run: |
+          # Decode base64 PFX (password-protected strong-name key)
+          $pfxPath = Join-Path $env:GITHUB_WORKSPACE "signingkey.pfx"
+          $pfxBytes = [Convert]::FromBase64String($env:SIGNINGKEY_B64)
+          [IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
+
+          # Load certificate to get the private key
+          $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(
+            $pfxPath,
+            $env:SIGNINGKEY_PASSWORD,
+            [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable
+          )
+          
+          # Get the RSA key and export parameters
+          $rsa = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)
+          $rsaParams = $rsa.ExportParameters($true)
+          
+          # Create a key container with a known name
+          $containerName = "GitHubActionsSigningKey_$([guid]::NewGuid().ToString('N'))"
+          $cspParams = [System.Security.Cryptography.CspParameters]::new()
+          $cspParams.KeyContainerName = $containerName
+          $cspParams.Flags = [System.Security.Cryptography.CspProviderFlags]::UseMachineKeyStore
+          
+          # Import the key into the container
+          $csp = [System.Security.Cryptography.RSACryptoServiceProvider]::new($cspParams)
+          $csp.ImportParameters($rsaParams)
+          $csp.PersistKeyInCsp = $true
+          
+          Write-Host "Key container created: $containerName"
+          
+          # Clean up the file
+          Remove-Item $pfxPath -Force
+          
+          echo "KEY_CONTAINER_NAME=$containerName" >> $env:GITHUB_ENV
+
+      - name: Build Archiver (${{ matrix.platform }})
+        run: |
+          msbuild Archiver/Archiver.vbproj `
+            /p:Configuration=${{ matrix.configuration }} `
+            /p:Platform=${{ matrix.platform }} `
+            /p:SignAssembly=true `
+            /p:KeyContainerName="$env:KEY_CONTAINER_NAME" `
+            /v:minimal
+
+      - name: Clean up signing key
+        if: always()
+        run: |
+          # Remove key container
+          if ($env:KEY_CONTAINER_NAME) {
+            try {
+              $cspParams = [System.Security.Cryptography.CspParameters]::new()
+              $cspParams.KeyContainerName = $env:KEY_CONTAINER_NAME
+              $cspParams.Flags = [System.Security.Cryptography.CspProviderFlags]::UseMachineKeyStore
+              
+              $rsa = [System.Security.Cryptography.RSACryptoServiceProvider]::new($cspParams)
+              $rsa.PersistKeyInCsp = $false
+              $rsa.Clear()
+              
+              Write-Host "Removed key container: $env:KEY_CONTAINER_NAME"
+            } catch {
+              Write-Warning "Failed to remove key container: $_"
+            }
+          }
+
+      - name: Upload signed artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Archiver-${{ matrix.configuration }}-${{ matrix.platform }}-signed
+          path: Archiver/bin/${{ matrix.platform }}/${{ matrix.configuration }}/
+          if-no-files-found: error
+
+  installer:
+    name: Build Installer
+    runs-on: windows-latest
+    needs: build
+    environment: release
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          $isccPath = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          
+          if (Test-Path $isccPath) {
+            Write-Host "Inno Setup already installed at: $isccPath"
+          } else {
+            Write-Host "Installing Inno Setup via Chocolatey..."
+            choco install innosetup -y --no-progress
+            
+            if (!(Test-Path $isccPath)) {
+              throw "ISCC.exe not found at $isccPath after installation"
+            }
+          }
+
+          Write-Host "ISCC.exe found at: $isccPath"
+          echo "ISCC_PATH=$isccPath" >> $env:GITHUB_ENV
+
+      - name: Install Windows SDK (for signtool)
+        shell: pwsh
+        run: |
+          Write-Host "Installing Windows SDK via Chocolatey..."
+          choco install windows-sdk-10.0 -y --no-progress
+
+      - name: Find signtool.exe
+        shell: pwsh
+        run: |
+          Write-Host "Searching for signtool.exe..."
+
+          $searchPath = "C:\Program Files (x86)\Windows Kits\10\bin"
+          $signtoolPaths = Get-ChildItem -Path $searchPath -Recurse -Filter "signtool.exe" -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match "\\x64\\signtool\.exe$" } |
+            Sort-Object { $_.Directory.Parent.Name -as [version] } -Descending
+
+          if ($signtoolPaths.Count -eq 0) {
+            throw "signtool.exe not found in $searchPath"
+          }
+
+          $signtoolPath = $signtoolPaths[0].FullName
+          Write-Host "Found signtool.exe at: $signtoolPath"
+          echo "SIGNTOOL_PATH=$signtoolPath" >> $env:GITHUB_ENV
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: Archiver-Release-*-signed
+          path: Archiver/bin
+          merge-multiple: false
+
+      - name: Reorganize artifacts to match expected structure
+        shell: pwsh
+        run: |
+          Write-Host "Reorganizing artifacts..."
+
+          # Artifacts are downloaded to: Archiver/bin/Archiver-Release-x86-signed/ and Archiver/bin/Archiver-Release-x64-signed/
+          # Need to move to: Archiver/bin/x86/Release/ and Archiver/bin/x64/Release/
+
+          # Create target directories
+          New-Item -ItemType Directory -Force -Path "Archiver\bin\x86\Release" | Out-Null
+          New-Item -ItemType Directory -Force -Path "Archiver\bin\x64\Release" | Out-Null
+
+          # Move x86 files
+          Move-Item -Path "Archiver\bin\Archiver-Release-x86-signed\*" -Destination "Archiver\bin\x86\Release\" -Force
+          Remove-Item -Path "Archiver\bin\Archiver-Release-x86-signed" -Recurse -Force
+
+          # Move x64 files
+          Move-Item -Path "Archiver\bin\Archiver-Release-x64-signed\*" -Destination "Archiver\bin\x64\Release\" -Force
+          Remove-Item -Path "Archiver\bin\Archiver-Release-x64-signed" -Recurse -Force
+
+          # Verify DLLs exist
+          $x86Dll = "Archiver\bin\x86\Release\Archiver.dll"
+          $x64Dll = "Archiver\bin\x64\Release\Archiver.dll"
+
+          if (!(Test-Path $x86Dll)) { throw "x86 DLL not found at $x86Dll" }
+          if (!(Test-Path $x64Dll)) { throw "x64 DLL not found at $x64Dll" }
+
+          Write-Host "x86 DLL: $x86Dll ($('{0:N0}' -f (Get-Item $x86Dll).Length) bytes)"
+          Write-Host "x64 DLL: $x64Dll ($('{0:N0}' -f (Get-Item $x64Dll).Length) bytes)"
+
+      - name: Extract version from AssemblyInfo.vb
+        id: version
+        shell: pwsh
+        run: |
+          $assemblyInfoPath = "Archiver\My Project\AssemblyInfo.vb"
+          $content = Get-Content -Path $assemblyInfoPath -Raw
+
+          # Match: <Assembly: AssemblyVersion("1.2.3.4")>
+          $match = [regex]::Match($content, '<Assembly:\s*AssemblyVersion\("(?<ver>[\d.]+)"\)>', 'IgnoreCase')
+
+          if (!$match.Success) {
+            throw "Could not extract version from $assemblyInfoPath"
+          }
+
+          $version = $match.Groups["ver"].Value
+          Write-Host "Extracted version: $version"
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Decode signing certificate
+        shell: pwsh
+        run: |
+          $pfxBytes = [Convert]::FromBase64String("${{ secrets.SIGNINGKEY_B64 }}")
+          $pfxPath = "$env:GITHUB_WORKSPACE\signingkey.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
+
+          Write-Host "Certificate written to: $pfxPath"
+          echo "PFX_PATH=$pfxPath" >> $env:GITHUB_ENV
+
+      - name: Create output directory
+        shell: pwsh
+        run: |
+          $outputDir = "dist\installer"
+          New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
+          Write-Host "Created output directory: $outputDir"
+
+      - name: Compile Inno Setup installer
+        shell: pwsh
+        env:
+          SIGNING_PASSWORD: ${{ secrets.SIGNINGKEY_PASSWORD }}
+        run: |
+          $issPath = "Archiver\installer\inno_script.iss"
+          $version = "${{ steps.version.outputs.VERSION }}"
+
+          Write-Host "Compiling Inno Setup installer..."
+          Write-Host "  Script: $issPath"
+          Write-Host "  Version: $version"
+
+          # Build ISCC arguments (without signing - we'll sign after)
+          $isccArgs = @(
+            "/DAppVersion=$version",
+            $issPath
+          )
+
+          & $env:ISCC_PATH @isccArgs
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "ISCC.exe failed with exit code $LASTEXITCODE"
+          }
+
+          Write-Host "Installer compiled successfully"
+
+      - name: Sign installer
+        shell: pwsh
+        env:
+          SIGNING_PASSWORD: ${{ secrets.SIGNINGKEY_PASSWORD }}
+        run: |
+          $installerDir = "dist\installer"
+          $installers = Get-ChildItem -Path $installerDir -Filter "Archiver-Setup-*.exe"
+
+          if ($installers.Count -eq 0) {
+            throw "No installer found in $installerDir"
+          }
+
+          $installerPath = $installers[0].FullName
+          
+          Write-Host "Signing installer: $installerPath"
+          
+          & $env:SIGNTOOL_PATH sign /fd sha256 /f "$env:PFX_PATH" /p "$env:SIGNING_PASSWORD" /tr http://timestamp.digicert.com /td sha256 "$installerPath"
+          
+          if ($LASTEXITCODE -ne 0) {
+            throw "Signing failed with exit code $LASTEXITCODE"
+          }
+          
+          Write-Host "Installer signed successfully"
+
+      - name: Find and verify installer
+        id: installer
+        shell: pwsh
+        run: |
+          $installerDir = "dist\installer"
+          $installers = Get-ChildItem -Path $installerDir -Filter "Archiver-Setup-*.exe"
+
+          if ($installers.Count -eq 0) {
+            throw "No installer found in $installerDir"
+          }
+
+          $installerPath = $installers[0].FullName
+          $installerName = $installers[0].Name
+
+          Write-Host "Found installer: $installerName"
+          Write-Host "  Path: $installerPath"
+          Write-Host "  Size: $('{0:N0}' -f $installers[0].Length) bytes"
+
+          echo "INSTALLER_PATH=$installerPath" >> $env:GITHUB_OUTPUT
+          echo "INSTALLER_NAME=$installerName" >> $env:GITHUB_OUTPUT
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Archiver-Installer
+          path: ${{ steps.installer.outputs.INSTALLER_PATH }}
+          if-no-files-found: error
+
+      - name: Attach installer to GitHub release (if tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $installerPath = "${{ steps.installer.outputs.INSTALLER_PATH }}"
+          $installerName = "${{ steps.installer.outputs.INSTALLER_NAME }}"
+
+          Write-Host "Checking for existing release with tag: $tag"
+
+          # Check if release exists
+          gh release view $tag 2>$null
+
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Release found. Uploading installer..."
+            gh release upload $tag $installerPath --clobber
+            Write-Host "Installer uploaded successfully: $installerName"
+          } else {
+            Write-Host "No release found for tag $tag. Creating release..."
+            gh release create $tag $installerPath --title "Release $tag" --generate-notes
+            Write-Host "Release created with installer: $installerName"
+          }
+
+  release:
+    name: Create GitHub Release
+    needs: installer
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Download x86 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Archiver-Release-x86-signed
+          path: ./artifacts/x86
+
+      - name: Download x64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Archiver-Release-x64-signed
+          path: ./artifacts/x64
+
+      - name: Download installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Archiver-Installer
+          path: ./artifacts/installer
+
+      - name: Attach DLLs to existing release
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+
+          Write-Host "Uploading DLL artifacts to release $tag..."
+
+          gh release upload $tag `
+            "./artifacts/x86/Archiver.dll#Archiver.dll (x86)" `
+            "./artifacts/x64/Archiver.dll#Archiver.dll (x64)" `
+            --clobber
+
+          Write-Host "DLL artifacts uploaded successfully"
