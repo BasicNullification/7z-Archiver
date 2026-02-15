@@ -304,31 +304,6 @@ jobs:
           path: ${{ steps.installer.outputs.INSTALLER_PATH }}
           if-no-files-found: error
 
-      - name: Attach installer to GitHub release (if tag)
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: pwsh
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $tag = "${{ github.ref_name }}"
-          $installerPath = "${{ steps.installer.outputs.INSTALLER_PATH }}"
-          $installerName = "${{ steps.installer.outputs.INSTALLER_NAME }}"
-
-          Write-Host "Checking for existing release with tag: $tag"
-
-          # Check if release exists
-          gh release view $tag 2>$null
-
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "Release found. Uploading installer..."
-            gh release upload $tag $installerPath --clobber
-            Write-Host "Installer uploaded successfully: $installerName"
-          } else {
-            Write-Host "No release found for tag $tag. Creating release..."
-            gh release create $tag $installerPath --title "Release $tag" --generate-notes
-            Write-Host "Release created with installer: $installerName"
-          }
-
   release:
     name: Create GitHub Release
     needs: installer
@@ -359,18 +334,76 @@ jobs:
           name: Archiver-Installer
           path: ./artifacts/installer
 
-      - name: Attach DLLs to existing release
+      - name: Create DLL package for manual registration
+        id: package
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag -replace '^v', ''
+          
+          # Create package directory structure
+          $packageDir = ".\DLL-Package"
+          New-Item -ItemType Directory -Force -Path "$packageDir\x86" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$packageDir\x64" | Out-Null
+          
+          # Copy DLLs to package
+          Copy-Item ".\artifacts\x86\Archiver.dll" -Destination "$packageDir\x86\"
+          Copy-Item ".\artifacts\x64\Archiver.dll" -Destination "$packageDir\x64\"
+          
+          # Create README for manual registration
+          $readme = @"
+          Archiver DLL Package - Manual Registration
+          ===========================================
+          
+          This package contains the Archiver COM DLL for manual registration.
+          
+          For x86 systems or x86 applications:
+            regsvr32 x86\Archiver.dll
+          
+          For x64 systems or x64 applications:
+            regsvr32 x64\Archiver.dll
+          
+          Note: You may need to run as Administrator.
+          "@
+          
+          Set-Content -Path "$packageDir\README.txt" -Value $readme
+          
+          # Create ZIP file with correct naming
+          $zipName = "Archiver-Manual-v$version.zip"
+          Compress-Archive -Path "$packageDir\*" -DestinationPath $zipName -Force
+          
+          Write-Host "Created package: $zipName"
+          Write-Host "  x86 DLL: $('{0:N0}' -f (Get-Item "$packageDir\x86\Archiver.dll").Length) bytes"
+          Write-Host "  x64 DLL: $('{0:N0}' -f (Get-Item "$packageDir\x64\Archiver.dll").Length) bytes"
+          
+          echo "ZIP_PATH=$zipName" >> $env:GITHUB_OUTPUT
+
+      - name: Upload release assets
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $tag = "${{ github.ref_name }}"
+          $zipPath = "${{ steps.package.outputs.ZIP_PATH }}"
+          $installer = Get-ChildItem -Path ".\artifacts\installer" -Filter "*.exe" | Select-Object -First 1
 
-          Write-Host "Uploading DLL artifacts to release $tag..."
+          Write-Host "Checking for existing release with tag: $tag"
+
+          # Check if release exists, create if it doesn't
+          gh release view $tag 2>$null
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "No release found. Creating release $tag..."
+            gh release create $tag --title "Release $tag" --generate-notes
+          }
+
+          Write-Host "Uploading release assets for $tag..."
+          Write-Host "  Installer: $($installer.Name)"
+          Write-Host "  DLL Package: $zipPath"
 
           gh release upload $tag `
-            "./artifacts/x86/Archiver.dll#Archiver.dll (x86)" `
-            "./artifacts/x64/Archiver.dll#Archiver.dll (x64)" `
+            "$($installer.FullName)" `
+            "$zipPath" `
             --clobber
 
-          Write-Host "DLL artifacts uploaded successfully"
+          Write-Host "Release assets uploaded successfully"
